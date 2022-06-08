@@ -7,10 +7,11 @@ def main():
     option = 1
     nn = neuronal_network()
     if option == 0:
-        nn.generate_from_shape([728, 500, 100, 40, 1])
-        nn.from_str(str(nn))
+        shape = [728, 500, 100, 40, 1]
+        nn.generate_from_shape(shape)
+        print(len(shape))
         nn.save_to_file('./network.txt')
-    else:
+    elif option == 1:
         nn.read_from_file('./network.txt')
         print(nn.activation)
 
@@ -31,7 +32,7 @@ class activation(Enum):
     sine = 'sine'
     none = 'none'
             
-def activate(self, value: float, activation_function: activation):
+def activate(value: float, activation_function: activation):
     if activation_function == activation.none:
         return value
     elif activation_function == activation.sine:
@@ -39,7 +40,7 @@ def activate(self, value: float, activation_function: activation):
     elif activation_function == activation.sigmoid:
         return 1 / (1 + math.pow(math.e, -value))
         
-def derivative(self, input_activation_value, activation_function: activation) -> float:
+def derivative(input_activation_value, activation_function: activation) -> float:
     x = input_activation_value
     if activation_function == activation.sine:
         return -math.cos(x)
@@ -47,26 +48,53 @@ def derivative(self, input_activation_value, activation_function: activation) ->
         return ((x-1)*math.pow(math.e, x-1) - (x-1)*math.pow(math.e, x-1) * math.pow(math.e, x)) / (math.pow(1-math.e, 2))
     elif activation_function == activation.none:
         return 1
+    
+def linear_function(previous_activations: list[float], weights: list[float], bias: float):
+    output = bias
+    for i in range(len(previous_activations)):
+        output += previous_activations[i] * weights[i]
+    return output
         
-class neuron_values:
-    def __init__(self) -> None:
-        pass
-
-
 class neuronal_network:
     def __init__(self, mutation_max_variation=0.17, mutation_chance=0.27):
         self.mutation_max_variation = mutation_max_variation
         self.mutation_chance = mutation_chance
     
-    def execute_network(self, input: list[float], return_all_values):
-        pass
+    def execute_network(self, input_vals: list[float], return_all_values=False):
+        """When the argument return_all_values is False(default value) this function returns the output layer"""
+        neuron_outputs = [input_vals]
+        linear_functions = []
+        for layer in range(1, len(self.shape)):
+            layer_output = []
+            layer_linear_functions = []
+            
+            is_output_layer = layer == len(self.shape) - 1
+            if not is_output_layer:
+                activation_function = self.activation
+            else:
+                activation_function = self.output_activation
+                
+            for neuron in range(self.shape[layer]):
+                previous_activations = neuron_outputs[-1]
+                linear = linear_function(previous_activations, self.weights[layer][neuron])
+                layer_output.append(activate(linear, activation_function))
+                
+                layer_linear_functions.append(linear)
+            
+            linear_functions.append(layer_linear_functions)
+            neuron_outputs.append(layer_output)
+        
+        if not return_all_values:
+            return neuron_outputs[-1]
+        else:
+            return (linear_functions, neuron_outputs)
     
     def __str__(self) -> str:
         activation = str(self.activation).removeprefix('activation.')
         output_activation = str(self.output_activation).removeprefix('activation.')
         output = f'activation: {activation}\noutput activation: {output_activation}\n'
         
-        output += f'mutation max variation: {self.mutation_max_variation}:\n' + f'mutation chance: {self.mutation_chance}\n'
+        output += f'mutation max variation: {self.mutation_max_variation}\n' + f'mutation chance: {self.mutation_chance}\n'
         
         output += 'biases:\n---\n'
         for i, layer_biases in enumerate(self.biases):
