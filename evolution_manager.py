@@ -2,9 +2,9 @@ import neuronal_network as nn
 
 def main():
     manager = evolution_manager(100, [625, 1])
-    #manager = from_str(str(manager))
-    with open('networks.txt', 'w') as f:
-        f.write(str(manager))
+    manager.write_to_file('networks.txt')
+    manager.read_from_file('networks.txt')
+    print(len(manager.networks), len(manager.ratings))
 
 class evolution_manager:
     def __init__(self, starting_network_count: int, starting_shape: list[int]):
@@ -48,9 +48,10 @@ class evolution_manager:
         output = output.removeprefix('\n,,,\n')
         return output
     
-    def from_str(self, string: str):
+    def from_str(self, string: str) -> None:
         networks_str = string.split('\n,,,\n')
-        output = evolution_manager(0, [])
+        self.networks = []
+        self.ratings = []
         for i, network_str in enumerate(networks_str):
             rating_and_network_str = network_str.split('\n<<<\n')
             rating_str = rating_and_network_str[0].removeprefix('network rating: ')
@@ -61,7 +62,6 @@ class evolution_manager:
             if rating_str != 'None':
                 self.ratings.append(int(rating_str))
             self.networks.append(network)
-        return output
     
     def read_from_file(self, path: str):
         path += '.txt' * path.__contains__('.txt')
@@ -71,7 +71,11 @@ class evolution_manager:
             for i, line in enumerate(lines):
                 text += line
         self.from_str(text)
-
+        
+    def write_to_file(self, path: str):
+        path += '.txt' * path.__contains__('.txt')
+        with open(path, 'w') as f:
+            f.write(self.__str__())
         
 if __name__ == '__main__':
     main()
