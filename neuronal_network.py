@@ -1,17 +1,14 @@
 import random as r
 from functions import generate_weight, linear_function, activate, derivative, get_variation, will_mutate
-from classes import activation, interconnection
+from classes import activation, interconnection, interconnection_from_string
 
 def main():
-    option = 0
     nn = neuronal_network()
-    if option == 0:
-        shape = [728, 500, 100, 40, 1]
-        nn.generate_from_shape(shape)
-        nn.save_to_file('./network.txt')
-    elif option == 1:
-        nn.read_from_file('./network.txt')
-        print(nn.activation)
+    shape = [728, 1]
+    nn.generate_from_shape(shape)
+    nn.save_to_file('./network.txt')
+    nn.read_from_file('./network.txt')
+    print(nn.activation)
         
 class neuronal_network:
     def __init__(self, mutation_max_variation=.17, mutation_chance=.27, evolution_new_neurons_chance=.1, max_mutate_mutation_value_variation=.05, max_mutate_mutation_of_mutations_variation=.03):
@@ -24,6 +21,8 @@ class neuronal_network:
     def execute_network(self, input_vals: list[float], return_all_values=False):
         """When the argument return_all_values is False(default value) this function returns the output layer output, else it returns a tuple containing all the linear function outputs from all the neurons grouped in lists of lists and all the neuron outputs grouped in lists of lists"""
         neuron_outputs = [input_vals]
+        for i in range(self.shape[0]):
+            self.interconnections[0][i] = input_vals[i]
         linear_functions = []
         for layer in range(1, len(self.shape)):
             layer_output = []
@@ -42,8 +41,10 @@ class neuronal_network:
                     connection = self.interconnections[pos[0]][pos[1]]
                     
                     linear += connection.value * connection.weights[[layer, neuron]]
+                activated_value = activate(linear, activation_function)
+                self.interconnections[layer][neuron].value = activated_value
                 
-                layer_output.append(activate(linear, activation_function))
+                layer_output.append(activated_value)
                 
                 layer_linear_functions.append(linear)
             
@@ -195,11 +196,11 @@ class neuronal_network:
             output += '\n'
         output += '___\n'
         
-        output += 'interconnections:\n==='
+        output += 'interconnections:\n===\n'
         for i, layer_connections in enumerate(self.interconnections):
             for j, connection in enumerate(layer_connections):
                 output += f'{connection}/'
-                output.removesuffix('/')
+            output = output.removesuffix('/')
             output += '\n'
         output = output.removesuffix('\n')
         
@@ -246,13 +247,12 @@ class neuronal_network:
             weights.append(layer_weights)
         self.weights = weights
             
-        connections_str = string.split('===')[1]
-        connections_str = string.splitlines(False)
+        connections_str = string.split('===\n')[1].split('\n')
         interconnections = []
         for i, layer_connections_str in enumerate(connections_str):
             layer_connections = []
             for j, connection_str in enumerate(layer_connections_str.split('/')):
-                layer_connections.append(interconnection.from_string(connection_str))
+                layer_connections.append(interconnection_from_string(connection_str))
             interconnections.append(layer_connections)
         
         self.interconnections = interconnections
@@ -283,20 +283,21 @@ class neuronal_network:
         weights = []
         biases = []
         interconnections = []
-        for i, length in enumerate(shape):
+        for layer_index, length in enumerate(shape):
             layer_weights = []
             layer_biases = []
             layer_interconnections = []
-            for j in range(length):
-                is_input = i == 0
+            for neuron_index in range(length):
+                layer_interconnections.append(interconnection())
+                
+                is_input = layer_index == 0
                 if not is_input:
                     neuron_weights = []
-                    previous_layer_length = shape[i-1]
-                    for k in range(previous_layer_length):
+                    previous_layer_length = shape[layer_index-1]
+                    for weight_index in range(previous_layer_length):
                         weight = generate_weight(min_weight=min_weight, max_weight=max_weight, closest_to_0=generated_weight_closest_to_0)
                         neuron_weights.append(weight)
 
-                    layer_interconnections.append(interconnection())
                     layer_biases.append(bias)
                     layer_weights.append(neuron_weights)
 

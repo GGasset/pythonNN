@@ -1,5 +1,11 @@
 import neuronal_network as nn
 
+def main():
+    manager = evolution_manager(100, [625, 1])
+    #manager = from_str(str(manager))
+    with open('networks.txt', 'w') as f:
+        f.write(str(manager))
+
 class evolution_manager:
     def __init__(self, starting_network_count: int, starting_shape: list[int]):
         self.networks = []
@@ -45,7 +51,7 @@ class evolution_manager:
 
 def from_str(string: str) -> evolution_manager:
     networks_str = string.split('\n,,,\n')
-    output = evolution_manager(0,[])
+    output = evolution_manager(0, [])
     for i, network_str in enumerate(networks_str):
         rating_and_network_str = network_str.split('\n<<<\n')
         rating_str = rating_and_network_str[0].removeprefix('network rating: ')
@@ -56,3 +62,7 @@ def from_str(string: str) -> evolution_manager:
         if rating_str != 'None':
             output.ratings.append(int(rating_str))
         output.networks.append(network)
+    return output
+        
+if __name__ == '__main__':
+    main()
