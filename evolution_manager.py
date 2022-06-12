@@ -48,15 +48,6 @@ class evolution_manager:
         output = output.removeprefix('\n,,,\n')
         return output
     
-    def read_from_file(self, path: str):
-        path += '.txt' * path.__contains__('.txt')
-        text = ''
-        with open(path, 'r') as f:
-            lines = f.readlines()
-            for i, line in enumerate(lines):
-                text += line
-        self.from_str(text)
-
     def from_str(self, string: str):
         networks_str = string.split('\n,,,\n')
         output = evolution_manager(0, [])
@@ -71,6 +62,16 @@ class evolution_manager:
                 self.ratings.append(int(rating_str))
             self.networks.append(network)
         return output
+    
+    def read_from_file(self, path: str):
+        path += '.txt' * path.__contains__('.txt')
+        text = ''
+        with open(path, 'r') as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                text += line
+        self.from_str(text)
+
         
 if __name__ == '__main__':
     main()
