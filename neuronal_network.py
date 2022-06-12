@@ -55,7 +55,6 @@ class neuronal_network:
         else:
             return (linear_functions, neuron_outputs)
     
-    
     def evolve(self):
         if will_mutate(self.mutation_chance):
             self.mutation_chance += get_variation(self.max_mutate_mutation_variation)
@@ -323,7 +322,6 @@ class neuronal_network:
         self.add_new_neuron_chance = network.add_new_neurons_chance
         self.max_mutate_mutation_variation = network.max_mutate_mutation_value_variation
         self.max_mutate_mutation_of_mutations_variation = network.max_mutate_mutation_of_mutations_variation
-
 
 if __name__ == '__main__':
     main()

@@ -7,17 +7,24 @@ class evolution_manager:
             network = nn.neuronal_network()
             network.generate_from_shape(starting_shape)
             self.networks.append(network)
-        self.scores = {}
+        self.ratings = []
     
     def have_child(self, max_child_per_network)->None:
         '''All the networks must have a rating to properly work. Childs will automatically mutate.'''
-        max_score = 0
-        for i in self.scores.keys:
-            max_score += (self.scores[i] - max_score) * self.scores[i] > max_score
+        max_rating = 0
+        for i in self.ratings.keys:
+            max_rating += (self.ratings[i] - max_rating) * self.ratings[i] > max_rating
         for i, network in enumerate(self.networks):
-            childs = network.have_child(max_child_per_network, self.scores[i], max_score)
+            childs = network.have_child(max_child_per_network, self.ratings[i], max_rating)
             for i, child in enumerate(childs):
                 self.networks.append(child)
                 
     def set_score(self, index: int, score: float)->None:
-        self.scores[index] = score
+        self.ratings[index] = score
+        
+    def get_unrated_networks(self) -> list[nn.neuronal_network]:
+        return self.networks[len(self.ratings):]
+    
+    def rate_networks(self, ratings: list[float]):
+        for i, rating in enumerate(ratings):
+            self.ratings.append(rating)
