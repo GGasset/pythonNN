@@ -47,22 +47,30 @@ class evolution_manager:
             output += f'\n,,,\nnetwork rating: {rating_str}\n<<<\n{str(network)}'
         output = output.removeprefix('\n,,,\n')
         return output
-        
+    
+    def read_from_file(self, path: str):
+        path += '.txt' * path.__contains__('.txt')
+        text = ''
+        with open(path, 'r') as f:
+            lines = f.readlines()
+            for i, line in enumerate(lines):
+                text += line
+        self.from_str(text)
 
-def from_str(string: str) -> evolution_manager:
-    networks_str = string.split('\n,,,\n')
-    output = evolution_manager(0, [])
-    for i, network_str in enumerate(networks_str):
-        rating_and_network_str = network_str.split('\n<<<\n')
-        rating_str = rating_and_network_str[0].removeprefix('network rating: ')
-        
-        network = nn.neuronal_network()
-        network.from_str(rating_and_network_str[1])
-        
-        if rating_str != 'None':
-            output.ratings.append(int(rating_str))
-        output.networks.append(network)
-    return output
+    def from_str(self, string: str):
+        networks_str = string.split('\n,,,\n')
+        output = evolution_manager(0, [])
+        for i, network_str in enumerate(networks_str):
+            rating_and_network_str = network_str.split('\n<<<\n')
+            rating_str = rating_and_network_str[0].removeprefix('network rating: ')
+            
+            network = nn.neuronal_network()
+            network.from_str(rating_and_network_str[1])
+            
+            if rating_str != 'None':
+                self.ratings.append(int(rating_str))
+            self.networks.append(network)
+        return output
         
 if __name__ == '__main__':
     main()
