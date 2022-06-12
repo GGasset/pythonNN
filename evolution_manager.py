@@ -64,7 +64,7 @@ class evolution_manager:
             self.networks.append(network)
     
     def read_from_file(self, path: str):
-        path += '.txt' * path.__contains__('.txt')
+        path += '.txt' * (not path.__contains__('.txt'))
         text = ''
         with open(path, 'r') as f:
             lines = f.readlines()
@@ -73,7 +73,7 @@ class evolution_manager:
         self.from_str(text)
         
     def write_to_file(self, path: str):
-        path += '.txt' * path.__contains__('.txt')
+        path += '.txt' * (not path.__contains__('.txt'))
         with open(path, 'w') as f:
             f.write(self.__str__())
         
