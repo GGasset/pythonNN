@@ -28,3 +28,31 @@ class evolution_manager:
     def rate_networks(self, ratings: list[float]):
         for i, rating in enumerate(ratings):
             self.ratings.append(rating)
+            
+    def __str__(self) -> str:
+        output = ''
+        for i, network in enumerate(self.networks):
+            output += ''
+            rating_str = ''
+            if i < len(self.ratings):
+                rating_str += str(self.ratings[i])
+            else:
+                rating_str += 'None'
+            output += f'\n,,,\nnetwork rating: {rating_str}\n<<<\n{str(network)}'
+        output = output.removeprefix('\n,,,\n')
+        return output
+        
+
+def from_str(string: str) -> evolution_manager:
+    networks_str = string.split('\n,,,\n')
+    output = evolution_manager(0,[])
+    for i, network_str in enumerate(networks_str):
+        rating_and_network_str = network_str.split('\n<<<\n')
+        rating_str = rating_and_network_str[0].removeprefix('network rating: ')
+        
+        network = nn.neuronal_network()
+        network.from_str(rating_and_network_str[1])
+        
+        if rating_str != 'None':
+            output.ratings.append(int(rating_str))
+        output.networks.append(network)
