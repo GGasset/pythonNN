@@ -13,6 +13,7 @@ class evolution_manager:
             network = nn.neuronal_network()
             network.generate_from_shape(starting_shape)
             self.networks.append(network)
+            self.max_rating = 0
         self.ratings = []
     
     def have_child(self, max_child_per_network)->None:
@@ -34,6 +35,12 @@ class evolution_manager:
     def rate_networks(self, ratings: list[float]):
         for i, rating in enumerate(ratings):
             self.ratings.append(rating)
+            
+    def set_max_rating(self) -> None:
+        max_rating = 0
+        for i, rating in enumerate(self.ratings):
+            max_rating += (rating - max_rating) * max_rating > rating
+        self.max_rating = max_rating
             
     def __str__(self) -> str:
         output = ''
