@@ -14,6 +14,7 @@ class evolution_manager:
             network.generate_from_shape(starting_shape)
             self.networks.append(network)
             self.max_rating = 0
+            self.max_rated_network = -1
         self.ratings = []
     
     def have_child(self, max_child_per_network)->None:
@@ -38,9 +39,12 @@ class evolution_manager:
             
     def set_max_rating(self) -> None:
         max_rating = 0
+        max_rated_network = -1
         for i, rating in enumerate(self.ratings):
             max_rating += (rating - max_rating) * max_rating > rating
+            max_rated_network += (i - max_rated_network) * max_rating > rating
         self.max_rating = max_rating
+        self.max_rated_network = max_rated_network
             
     def __str__(self) -> str:
         output = ''
