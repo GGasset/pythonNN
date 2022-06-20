@@ -1,28 +1,39 @@
 import random as r
 from functions import generate_weight, linear_function, activate, derivative, get_variation, will_mutate
-from classes import activation, interconnection, interconnection_from_string
+from classes import activation, interconnection
 
 def main():
     nn = neuronal_network()
-    shape = [728, 1]
+    shape = [3, 1]
     nn.generate_from_shape(shape)
+    for i in range(50):
+        nn.evolve()
     nn.save_to_file('./network.txt')
     nn.read_from_file('./network.txt')
+    nn.save_to_file('./network.txt')
+    values = []
+    for i in range(nn.shape[0]):
+        values.append(r.randint(0, 20) + r.random())
+    print(f'execution with random values: {nn.execute_network(values)}')
     print(nn.activation)
         
 class neuronal_network:
-    def __init__(self, mutation_max_variation=.17, mutation_chance=.27, evolution_new_neurons_chance=.1, max_mutate_mutation_value_variation=.05, max_mutate_mutation_of_mutations_variation=.03):
+    def __init__(self, mutation_max_variation=.17, mutation_chance=.27, evolution_new_neuron_chance=.1, evolution_layer_over_neuron_addition_chance=1/6, max_mutate_mutation_value_variation=.05, max_mutate_mutation_of_mutations_variation=.03):
         self.mutation_max_variation = mutation_max_variation
         self.mutation_chance = mutation_chance
-        self.new_neurons_chance = evolution_new_neurons_chance
+        self.new_neuron_chance = evolution_new_neuron_chance
         self.max_mutate_mutation_variation = max_mutate_mutation_value_variation
         self.max_mutate_mutation_of_mutations_variation = max_mutate_mutation_of_mutations_variation
+        self.layer_over_neuron_addition_chance = evolution_layer_over_neuron_addition_chance
+        self.has_interconnected_neurons = False
     
     def execute_network(self, input_vals: list[float], return_all_values=False):
         """When the argument return_all_values is False(default value) this function returns the output layer output, else it returns a tuple containing all the linear function outputs from all the neurons grouped in lists of lists and all the neuron outputs grouped in lists of lists"""
         neuron_outputs = [input_vals]
+        print(self.shape[0])
+        print(len(self.interconnections[0]))
         for i in range(self.shape[0]):
-            self.interconnections[0][i] = input_vals[i]
+            self.interconnections[0][i].value = input_vals[i]
         linear_functions = []
         for layer in range(1, len(self.shape)):
             layer_output = []
@@ -36,7 +47,7 @@ class neuronal_network:
                 
             for neuron in range(self.shape[layer]):
                 previous_activations = neuron_outputs[-1]
-                linear = linear_function(previous_activations, self.weights[layer][neuron])
+                linear = linear_function(previous_activations, self.weights[layer][neuron], self.biases[layer][neuron])
                 for i, pos in enumerate(self.interconnections[layer][neuron].backward_connected_neuron_pos):
                     connection = self.interconnections[pos[0]][pos[1]]
                     
@@ -67,7 +78,10 @@ class neuronal_network:
             self.mutation_max_variation += get_variation(self.max_mutate_mutation_variation)
             
         if will_mutate(self.mutation_chance):
-            self.add_new_neuron_chance += get_variation(self.mutation_max_variation)
+            self.layer_over_neuron_addition_chance += get_variation(self.max_mutate_mutation_variation)
+            
+        if will_mutate(self.mutation_chance):
+            self.new_neuron_chance += get_variation(self.mutation_max_variation)
         
         for i, layer_weights in enumerate(self.weights):
             for j, neuron_weights in enumerate(layer_weights):
@@ -82,81 +96,94 @@ class neuronal_network:
                 
         for i, layer_interconnections in enumerate(self.interconnections):
             for j, interconnection in enumerate(layer_interconnections):
-                for k in range(len(interconnection)):
+                for k in range(len(interconnection.weights)):
                     if will_mutate(self.mutation_chance):
-                        self.interconnections[i][j].front_weights[k] += get_variation(self.mutation_max_variation)
-                    
-        if r.random() > self.new_neurons_chance:
-            self.add_new_neuron()
+                        self.interconnections[i][j].weights[k] += get_variation(self.mutation_max_variation)
+             
+        if r.random() > self.new_neuron_chance:
+            layer_over_neuron_addition_chance = 1 / 6
+            if r.random() > layer_over_neuron_addition_chance and len(self.shape) > 2:
+                self.add_new_neuron()
+            else:
+                self.add_new_layer()
             
     def add_new_neuron(self):
-        layer_over_neuron_addition_chance = 1 / 6
-        
         layer_count = len(self.shape)
-        if r.random() > layer_over_neuron_addition_chance and layer_count > 2: # add new neuron
-            layer_index = r.randint(1, layer_count - 1)
+        if layer_count == 2:
+            exit(Exception('Cannot add a neuron at input-output layers'))
+        layer_index = r.randint(1, layer_count - 2)
+        
+        # at each neuron from layer_index + 1 add a new weight at the end
+        for i, neuron_weights in enumerate(self.weights[layer_index + 1]):
+            neuron_weights.append(generate_weight())
+        
+        # append the neuron with a list of weights with the previous layer length as its length
+        weights = []
+        previous_layer_length = self.shape[layer_index - 1]
+        for i in range(previous_layer_length):
+            weights.append(generate_weight())
+        self.weights[layer_index].append(weights)
+        
+        # append a bias and an empty interconnection
+        self.biases[layer_index].append(1)
+        self.interconnections[layer_index].append(interconnection())
+        
+        # update shape
+        self.shape[layer_index] += 1
             
-            # at each neuron from layer_index + 1 add a new weight at the end
-            for i, neuron_weights in enumerate(self.weights[layer_index + 1]):
-                neuron_weights.append(generate_weight())
-            
-            # append the neuron with a list of weights with the previous layer length as its length
-            weights = []
-            previous_layer_length = self.shape[layer_index - 1]
-            for i in range(previous_layer_length):
-                weights.append(generate_weight())
-            self.weights[layer_index].append(weights)
-            
-            # append a bias and an empty interconnection
-            self.biases[layer_index].append(1)
-            self.interconnections[layer_index].append(interconnection())
-            
-            # update shape
-            self.shape[layer_index] += 1
-            
-        else: # add new layer with one neuron
-            layer_insertion_index = r.randint(1, layer_count)
-            
-            # update interconnection positions
-            for layer_index, layer in enumerate(len(self.shape)):
-                for neuron_index in range(layer):
-                    interconnection = self.interconnections[layer_index][neuron_index]
+    def add_new_layer(self):
+        layer_count = len(self.shape)
+        layer_insertion_index = r.randint(1, layer_count - 1)
+        
+        # update interconnection positions
+        for layer_index, layer in enumerate(self.shape):
+            for neuron_index in range(layer):
+                current_interconnection = self.interconnections[layer_index][neuron_index]
+                
+                for i in range(len(current_interconnection.weights)):
                     # update interconnection's backwardly connected neuron position
-                    self.interconnections[layer_index][neuron_index].backward_connected_neuron_pos[0] += interconnection[0] >= layer_insertion_index
+                    self.interconnections[layer_index][neuron_index].backward_connections_pos[i][0] += current_interconnection.backward_connections_pos[i][0] >= layer_insertion_index
                     
-                    # set forwardly connected interconnections of previous layer
-                    self.interconnections[layer_index][neuron_index].forward_connected_neuron_pos[0] += interconnection[0] >= layer_insertion_index
-            
-            # set interconnection weights and positions
-            for neuron_index, neuron in enumerate(self.weights[layer_insertion_index]):
-                for weight_index, weight in enumerate(neuron):
-                    # connected neuron weight update
-                    self.interconnections[layer_insertion_index - 1][weight_index].weights.append(weight)
-                    
-                    # connect previous layer with insertion index layer
-                    self.interconnections[layer_insertion_index - 1][weight_index].front_connected_neuron_pos.append([layer_insertion_index, neuron_index])
-                    
-                    # connect insertion index layer with previous layer
-                    self.interconnections[layer_insertion_index][neuron_index].backward_connected_neurons_pos.append([layer_insertion_index - 1, weight_index])
-            
-            # update weights and bias in the next layer of the inserted layer
-            for neuron_index in range(self.shape[layer_insertion_index]):
-                self.weights[layer_insertion_index][neuron_index] = [generate_weight()]
-            
-            # insert weights at layer insertion index
-            neuron_weights = []
-            for i in range(self.shape[layer_insertion_index - 1]):
-                neuron_weights.append(generate_weight())
-            self.weights.insert(layer_insertion_index, [neuron_weights])
-            
-            # update shape
-            self.shape.insert(layer_insertion_index, 1)
+                    # update front connected interconnections of previous layer
+                    self.interconnections[layer_index][neuron_index].front_connections_pos[i][0] += current_interconnection.front_connections_pos[i][0] >= layer_insertion_index
+        
+        # set interconnection weights and positions
+        for neuron_index, neuron in enumerate(self.weights[layer_insertion_index]):
+            for weight_index, weight in enumerate(neuron):
+                # connected neuron weight update
+                self.interconnections[layer_insertion_index - 1][weight_index].weights.append(weight)
+                
+                # connect previous layer with insertion index layer
+                self.interconnections[layer_insertion_index - 1][weight_index].front_connections_pos.append([layer_insertion_index, neuron_index])
+                
+                # connect insertion index layer with previous layer
+                self.interconnections[layer_insertion_index][neuron_index].backward_connections_pos.append([layer_insertion_index - 1, weight_index])
+        self.has_interconnected_neurons = True
+        
+        # update weights in the next layer of the inserted layer
+        for neuron_index in range(self.shape[layer_insertion_index]):
+            self.weights[layer_insertion_index][neuron_index] = [generate_weight()]
+        
+        # insert bias at layer insertion index
+        self.biases.insert(layer_insertion_index, [1])
+        
+        # insert weights at layer insertion index
+        neuron_weights = []
+        for i in range(self.shape[layer_insertion_index - 1]):
+            neuron_weights.append(generate_weight())
+        self.weights.insert(layer_insertion_index, [neuron_weights])
+        
+        # insert an interconnection at layer insertion index
+        self.interconnections.insert(layer_insertion_index, [interconnection()])
+        
+        # update shape
+        self.shape.insert(layer_insertion_index, 1)
         
     def have_child(self, max_childs: float, network_score: float, max_score: float, mutate_child_networks=True):
         output = []
         child_count = int(network_score / max_score * max_childs)
         for i in range(child_count):
-            parent_copy = neuronal_network(mutation_max_variation=self.mutation_max_variation, mutation_chance=self.mutation_chance, evolution_new_neurons_chance=self.new_neurons_chance)
+            parent_copy = neuronal_network(mutation_max_variation=self.mutation_max_variation, mutation_chance=self.mutation_chance, evolution_new_neuron_chance=self.new_neuron_chance)
             parent_copy.from_network(self)
             
             if mutate_child_networks:
@@ -173,9 +200,10 @@ class neuronal_network:
         output += f'mutation max variation: {self.mutation_max_variation}\n' + f'mutation chance: {self.mutation_chance}\n'
         
         output += f'has interconnections: {self.has_interconnected_neurons}\n'
-        output += f'add new neurons evolution chance: {self.new_neurons_chance}\n'
+        output += f'add new neuron evolution chance: {self.new_neuron_chance}\n'
         output += f'max mutate mutation value variation: {self.max_mutate_mutation_variation}\n'
         output += f'max mutate mutation of mutations variation: {self.max_mutate_mutation_of_mutations_variation}\n'
+        output += f'layer_over_neuron_addition_chance: {self.layer_over_neuron_addition_chance}\n'
         
         output += 'biases:\n---'
         for i, layer_biases in enumerate(self.biases):
@@ -212,28 +240,28 @@ class neuronal_network:
         self.output_activation = activation(lines[1].removeprefix('output activation: '))
         self.mutation_max_variation = float(lines[2].removeprefix('mutation max variation: '))
         self.mutation_chance = float(lines[3].removeprefix('mutation chance: '))
-        self.has_interconnected_neurons = bool(lines[4].removeprefix('has interconnections: '))
-        self.add_new_neuron_chance = float(lines[5].removeprefix('add new neurons evolution chance: '))
+        self.has_interconnected_neurons = lines[4].removeprefix('has interconnections: ') == 'True'
+        self.new_neuron_chance = float(lines[5].removeprefix('add new neuron evolution chance: '))
         self.max_mutate_mutation_variation = float(lines[6].removeprefix('max mutate mutation value variation: '))
         self.max_mutate_mutation_of_mutations_variation = float(lines[7].removeprefix('max mutate mutation of mutations variation: '))
+        self.layer_over_neuron_addition_chance = float(lines[8].removeprefix('layer_over_neuron_addition_chance: '))
         
-        biases_str = string.split('---')[1]
+        biases_str = string.split('---')[1].removeprefix('\n').removesuffix('\n')
         network_biases = biases_str.split('\n')
-        biases = []
+        biases = [[]]
         self.shape = []
         for i, layer in enumerate(network_biases):
             layer_biases_str = layer.split(',')
-            self.shape.append(len(layer_biases_str))
             layer_biases = []
             for j, bias in enumerate(layer_biases_str):
-                if bias != '':
-                    layer_biases.append(float(bias))
-            biases.append(biases)
+                layer_biases.append(float(bias))
+            biases.append(layer_biases)
+            self.shape.append(len(layer_biases))
         self.biases = biases
         
-        weights_str = string.split('___')[1]
+        weights_str = string.split('___')[1].removeprefix('\n').removesuffix('\n')
         weights_str = weights_str.split('\n')
-        weights = []
+        weights = [[]]
         for i, layer in enumerate(weights_str):
             layer_weights_str = layer.split('/')
             layer_weights = []
@@ -241,18 +269,19 @@ class neuronal_network:
                 neuron_weights = []
                 splitted_neuron_weights_str = neuron_weights_str.split(',')
                 for k, weight in enumerate(splitted_neuron_weights_str):
-                    if weight != '':
-                        neuron_weights.append(float(weight))
+                    neuron_weights.append(float(weight))
                 layer_weights.append(neuron_weights)
             weights.append(layer_weights)
         self.weights = weights
             
-        connections_str = string.split('===\n')[1].split('\n')
+        connections_str = string.split('===')[1].removeprefix('\n').removesuffix('\n').split('\n')
         interconnections = []
         for i, layer_connections_str in enumerate(connections_str):
             layer_connections = []
             for j, connection_str in enumerate(layer_connections_str.split('/')):
-                layer_connections.append(interconnection_from_string(connection_str))
+                current_interconnection = interconnection()
+                current_interconnection.from_str(connection_str)
+                layer_connections.append(current_interconnection)
             interconnections.append(layer_connections)
         
         self.interconnections = interconnections
@@ -275,7 +304,7 @@ class neuronal_network:
             
     def generate_from_shape(self, shape : list, activation=activation.sine, output_activation=activation.sine, bias=1, min_weight=-1.5, max_weight=1.5, generated_weight_closest_to_0=0.37) -> None:
         """shape: list containing the number of neurons at each layer, including input network. min_weight must be negative and max_weight negative for a correct functioning"""
-        self.lengths = shape
+        self.shape = shape
         self.activation = activation
         self.output_activation=output_activation
         self.has_interconnected_neurons = False
@@ -320,7 +349,7 @@ class neuronal_network:
         self.mutation_max_variation = network.mutation_max_variation
         self.mutation_chance = network.mutation_chance
         self.has_interconnected_neurons = network.has_interconnected_neurons
-        self.add_new_neuron_chance = network.add_new_neurons_chance
+        self.new_neuron_chance = network.new_neurons_chance
         self.max_mutate_mutation_variation = network.max_mutate_mutation_value_variation
         self.max_mutate_mutation_of_mutations_variation = network.max_mutate_mutation_of_mutations_variation
 
