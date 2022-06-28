@@ -1,16 +1,21 @@
 import random as r
-from functions import generate_weight, linear_function, activate, derivative, get_variation, will_mutate
-from classes import activation, interconnection
+from numpy import array
+from classes.enums import activation, cost_functions
+from classes.interconnection import interconnection
+from functions.execution import linear_function, activate
+from functions.training import activation_derivative, cost_function, cost_function_derivative
+from functions.evolution import get_variation, will_mutate
 
 def main():
     nn = neuronal_network()
     shape = [3, 1]
     nn.generate_from_shape(shape)
     nn.new_neuron_chance = .9
-    for i in range(100):
+    nn.layer_over_neuron_addition_chance = 1
+    for i in range(50):
         nn.evolve()
-    #nn.save_to_file('./network.txt')
-    #nn.read_from_file('./network.txt')
+    nn.save_to_file('./network.txt')
+    nn.read_from_file('./network.txt')
     #nn.save_to_file('./network.txt')
     values = []
     for i in range(nn.shape[0]):
@@ -31,8 +36,6 @@ class neuronal_network:
     def execute_network(self, input_vals: list[float], return_all_values=False):
         """When the argument return_all_values is False(default value) this function returns the output layer output, else it returns a tuple containing all the linear function outputs from all the neurons grouped in lists of lists and all the neuron outputs grouped in lists of lists"""
         neuron_outputs = [input_vals]
-        print(self.shape[0])
-        print(len(self.interconnections[0]))
         for i in range(self.shape[0]):
             self.interconnections[0][i].value = input_vals[i]
         linear_functions = []
@@ -50,6 +53,10 @@ class neuronal_network:
                 previous_activations = neuron_outputs[-1]
                 linear = linear_function(previous_activations, self.weights[layer][neuron], self.biases[layer][neuron])
                 for i, pos in enumerate(self.interconnections[layer][neuron].backward_connections_pos):
+                    #print(pos)
+                    #print(len(self.shape))
+                    #print(self.shape[pos[0]])
+                    #print()
                     connection = self.interconnections[pos[0]][pos[1]]
                     linear += connection.value * connection.weights[i]
                     
@@ -68,21 +75,81 @@ class neuronal_network:
         else:
             return (linear_functions, neuron_outputs)
     
-    def evolve(self):
-        if will_mutate(self.mutation_chance):
-            self.mutation_chance += get_variation(self.max_mutate_mutation_variation)
+    def fit(self, X: list[list[float]], y: list[list[float]], cost_function_enum: cost_function, create_cost_line_plot=True):
+        if self.has_interconnected_neurons:
+            exit(Exception('Cannot train interconnected, by evolution, networks'))
+    
+    def train(self, X: float, y: float, cost_function_enum: cost_functions):
+        # setup / execute network
+        linear_functions, neuron_outputs = self.execute_network(X, return_all_values=True)
+        output = neuron_outputs[-1]
+        costs = []
+        cost_derivatives = []
         
-        if will_mutate(self.mutation_chance):
-            self.max_mutate_mutation_variation += get_variation(self.max_mutate_mutation_of_mutations_variation)
+        # calculate cost and cost_derivatives
+        for i, output in enumerate(output):
+            costs.append(cost_function(output, y[i]))
+            cost_derivatives.append(cost_function_derivative(output, y[i], cost_function_enum))
+        
+        # get cost mean, informative output
+        total_cost = 0
+        for cost in costs:
+            total_cost += cost
+        total_cost /= len(costs)
+        
+        # set-up principal output
+        bias_grads = []
+        weight_grads = []
+        
+        # set-up variables
+        layer_gradients = cost_derivatives
+        previous_layer_gradients = layer_gradients
+        for layer_i in range(len(self.shape) - 1, -1, -1):
+            # create layer-lists for principal output
+            bias_grads.append([])
+            weight_grads.append([])
             
-        if will_mutate(self.mutation_chance):
-            self.mutation_max_variation += get_variation(self.max_mutate_mutation_variation)
+            # pass previous layer
+            layer_gradients = previous_layer_gradients
             
-        if will_mutate(self.mutation_chance):
-            self.layer_over_neuron_addition_chance += get_variation(self.max_mutate_mutation_variation)
-            
-        if will_mutate(self.mutation_chance):
-            self.new_neuron_chance += get_variation(self.mutation_max_variation)
+            # select current activation function
+            activation_function = None
+            if layer_i == len(self.shape) - 1:
+                activation_function = self.output_activation
+            else:
+                activation_function = self.activation
+                
+            previous_layer_gradients = []
+            for neuron_i in range(self.shape[layer_i]):
+                previous_layer_gradients.append(0)
+                
+            for neuron_i in range(self.shape[layer_i]):
+                # calculate gradient passed activation function, &L(loss) / &A(activation)
+                layer_gradients[neuron_i] *= activation_derivative(linear_functions[layer_i][neuron_i], activation_function)
+                
+                neuron_weights_grads = []
+                
+                for previous_layer_index in range(self.shape[layer_i - 1]):
+                    # calculate weight gradient &L(loss) / &W(weight)
+                    neuron_weights_grads.append(layer_gradients[neuron_i] * neuron_outputs[layer_i - 1][neuron_i][previous_layer_index])
+                    # calculate previous layer gradients &L(loss) / &X(Previous layer activation)
+                    previous_layer_gradients[neuron_i] += layer_gradients[neuron_i] * self.weights[layer_i][neuron_i][previous_layer_index]
+                    
+                weight_grads[layer_i].append(neuron_weights_grads)
+                
+                # save the calculated bias grad &L(loss) / &B(bias)
+                bias_grads[layer_i].append(layer_gradients[neuron_i])
+    
+    def evolve(self):
+        self.mutation_chance += get_variation(self.max_mutate_mutation_variation) * will_mutate(self.mutation_chance)
+
+        self.max_mutate_mutation_variation += get_variation(self.max_mutate_mutation_of_mutations_variation) * will_mutate(self.mutation_chance)
+        
+        self.mutation_max_variation += get_variation(self.max_mutate_mutation_variation) * will_mutate(self.mutation_chance)
+        
+        self.layer_over_neuron_addition_chance += get_variation(self.max_mutate_mutation_variation) * will_mutate(self.mutation_chance)
+        
+        self.new_neuron_chance += get_variation(self.mutation_max_variation) * will_mutate(self.mutation_chance)
         
         for i, layer_weights in enumerate(self.weights):
             for j, neuron_weights in enumerate(layer_weights):
@@ -109,8 +176,6 @@ class neuronal_network:
             
     def add_new_neuron(self):
         layer_count = len(self.shape)
-        if layer_count == 2:
-            exit(Exception('Cannot add a neuron at input-output layers'))
         layer_index = r.randint(1, layer_count - 2)
         
         # at each neuron from layer_index + 1 add a new weight at the end
@@ -136,33 +201,44 @@ class neuronal_network:
         layer_insertion_index = r.randint(1, layer_count - 1)
         
         # update interconnection positions
-        for layer_index, layer in enumerate(self.shape):
-            for neuron_index in range(layer):
+        for layer_index, layer_length in enumerate(self.shape):
+            for neuron_index in range(layer_length):
                 current_interconnection = self.interconnections[layer_index][neuron_index]
                 
-                for i in range(len(current_interconnection.weights)):
+                for connection_i in range(len(current_interconnection.weights)):
+                    if current_interconnection.front_connections_pos[connection_i][0] > len(self.shape):
+                        print('error')
+                    
                     # update interconnection's backwardly connected neuron position
-                    self.interconnections[layer_index][neuron_index].backward_connections_pos[i][0] += current_interconnection.backward_connections_pos[i][0] >= layer_insertion_index
+                    current_backward_connected_layer = current_interconnection.backward_connections_pos[connection_i][0]
+                    self.interconnections[layer_index][neuron_index].backward_connections_pos[connection_i][0] += current_backward_connected_layer >= layer_insertion_index
                     
                     # update front connected interconnections of previous layer
-                    self.interconnections[layer_index][neuron_index].front_connections_pos[i][0] += current_interconnection.front_connections_pos[i][0] >= layer_insertion_index
+                    current_front_connected_layer = current_interconnection.front_connections_pos[connection_i][0]
+                    self.interconnections[layer_index][neuron_index].front_connections_pos[connection_i][0] += current_front_connected_layer >= layer_insertion_index
         
-        # set interconnection weights and positions
+        
+        # add interconnection weights and positions
         for neuron_index, neuron_weights in enumerate(self.weights[layer_insertion_index]):
             for weight_index, weight in enumerate(neuron_weights):
                 # connected neuron weight update
                 self.interconnections[layer_insertion_index - 1][weight_index].weights.append(weight)
                 
-                # connect previous layer with insertion index layer
-                self.interconnections[layer_insertion_index - 1][weight_index].front_connections_pos.append([layer_insertion_index, neuron_index])
-                
                 # connect insertion index layer with previous layer
                 self.interconnections[layer_insertion_index][neuron_index].backward_connections_pos.append([layer_insertion_index - 1, weight_index])
-        self.has_interconnected_neurons = True
         
+        # connect previous layer with insertion index layer
+        previous_layer_length = self.shape[layer_insertion_index - 1]
+        for weight_i in range(previous_layer_length):
+            for neuron_i in range(self.shape[layer_insertion_index]):
+                self.interconnections[layer_insertion_index - 1][weight_i].front_connections_pos.append([layer_insertion_index + 1, neuron_i])
+        self.has_interconnected_neurons = True
+
+
         # update weights in the next layer of the inserted layer
         for neuron_index in range(self.shape[layer_insertion_index]):
             self.weights[layer_insertion_index][neuron_index] = [generate_weight()]
+        
         
         # insert bias at layer insertion index
         self.biases.insert(layer_insertion_index, [1])
@@ -304,12 +380,17 @@ class neuronal_network:
                 output += line
         self.from_str(output)
             
-    def generate_from_shape(self, shape : list, activation=activation.sine, output_activation=activation.sine, bias=1, min_weight=-1.5, max_weight=1.5, generated_weight_closest_to_0=0.37) -> None:
-        """shape: list containing the number of neurons at each layer, including input network. min_weight must be negative and max_weight negative for a correct functioning"""
+    def generate_from_shape(self, shape : list, activation=activation.sine, output_activation=None, bias=1, min_weight=-1.5, max_weight=1.5, generated_weight_closest_to_0=0.37) -> None:
+        """shape: list containing the number of neurons at each layer, including input network. min_weight must be negative and max_weight negative for a correct functioning
+        output_activation: if set to none it will use activation as activation function"""
         self.shape = shape
         self.activation = activation
-        self.output_activation=output_activation
+        if output_activation != None:
+            self.output_activation=output_activation
+        else:
+            self.output_activation=activation
         self.has_interconnected_neurons = False
+        
         
         weights = []
         biases = []
@@ -354,6 +435,18 @@ class neuronal_network:
         self.new_neuron_chance = network.new_neurons_chance
         self.max_mutate_mutation_variation = network.max_mutate_mutation_value_variation
         self.max_mutate_mutation_of_mutations_variation = network.max_mutate_mutation_of_mutations_variation
+
+def generate_weight(min_weight=-1.5, max_weight=1.5, closest_to_0=0.37):
+    """min_weight must be negative and max_weight negative for a correct functioning"""
+    is_below_threshold = True
+    closest_to_0 = abs(closest_to_0)
+    while is_below_threshold:
+        negative = r.randint(0, 1)
+        weight = r.random() * (min_weight * negative + max_weight * (negative == 0))
+        is_below_threshold = weight < closest_to_0
+        
+    weight *= (-1 * negative) + (1 * negative == 0)
+    return weight
 
 if __name__ == '__main__':
     main()

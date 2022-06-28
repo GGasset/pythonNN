@@ -1,11 +1,3 @@
-from enum import Enum
-
-
-class activation(Enum):
-    sigmoid = 'sigmoid'
-    sine = 'sine'
-    none = 'none'
-
 class interconnection:
     def __init__(self, front_weights=[], front_connections_pos=[], backward_connections_pos=[]):
         self.weights = front_weights
